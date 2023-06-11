@@ -1,0 +1,985 @@
+﻿Services
+	-catalogAPI     => 5011 => url: http://localhost:5011/swagger/index.html postman: http://localhost:5011/api/categories
+	-photostockAPI  => 5012 => url: http://localhost:5012/swagger/index.html postman: http://localhost:5012/api/photos
+	-basketAPI      => 5013 => url: http://localhost:5013/swagger/index.html
+	-discountAPI    => 5014 => url: http://localhost:5014/swagger/index.html
+	-orderAPI       => 5015 => url: http://localhost:5015/swagger/index.html
+	-fakePaymentAPI => 5016 => url: http://localhost:5016/swagger/index.html
+identityserver      => 5001 => url: http://localhost:5001/
+Gateway             => 5000 =>
+Web                 => 5010 =>
+NOT!!! eğer http://localhost:5011 yerine başka potta ayağa kalyorsa. ilk kestrel olarak bir çalıştır. sonra Set Startup Project olarak düzenle tekrar çalıştır.
+
+
+NOT!!! copilot değiştirme Alt +. ile yapılır.
+
+
+NOT!!!! PROJEYİ ÇALIŞTIRMAK İÇİN
+- portainer = docker run -d -p 9000:9000 -p 8000:8000 --name myportainerADI --restart always -v /var/run/docker.sock:/var/run/docker.sock portainer/portainer komutuyla 9000 portu ile
+- mongodb = docker pull mongo komutuyla 27017 portu ile
+- sql server windows versiyonu = docker pull mcr.microsoft.com/mssql/server:2019-latest komutuyla 1433 portu ile 
+- sql server linux versiyonu = docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=<your_password>' -p 1433:1433 --name sqlserver -d mcr.microsoft.com/mssql/server:latest komutuyla 1433 portu ile
+- redis = docker run -d --name myredisADI -p 6379:6379 redis komutuyla 6379 portu ile
+- postgres = docker run --name mypostgresADI -e POSTGRES_PASSWORD=123456 -p 5432:5432 -d postgres komutuyla 5432 portu ile
+- rabbitmq = docker run -d --hostname my-rabbit --name myrabbitADI -p 15672:15672 -p 5672:5672 rabbitmq:3-management komutuyla 15672 portu ile
+
+
+- docker-compose up -d
+- docker-compose down
+- docker-compose start
+- docker-compose stop
+bu komutlar ile çalıştırdıktan sonra
+http://localhost:5010/ kullanıcı adı: caran@gmail.com şifre:Password*12
+ile projeyi çalıştırabilirsin.
+
+
+*** Docker komutlarý ***
+docker run nginx
+docker build -t myapp:latest
+docker pull ubuntu:latest
+docker push myapp:latest
+docker images
+docker ps
+docker stop mycontainer
+docker start container_name
+docker resatart container_name
+docker kill container_name
+docker rm container_name
+docker rmi image_name
+docker exec -it mycontainer bash
+docker logs container_name
+docker imspect container_name
+docker cp local_file  container_name/container_path
+docker systmem prune
+docker save/load img>image.far docker load imagename
+
+*** Portainer Docker ***
+https://docs.portainer.io/   Dokumantasyonu
+https://docs.portainer.io/start/install-ce/server/docker/wsl dockerdesktop kurulumu
+https://hub.docker.com/r/portainer/portainer-ce
+admin C@ran1525
+
+*** Portainer Docker Hub baðlanma sorunu ***
+- Portainer içinde Registries de Authentication aktif hale getir
+
+*** Portainer Mongodb kurulumu ***
+- App Tempalets
+- Aramaya Mongo
+- Name= mongodb
+- + Show advanced options týkla ve içindeki host=27017 container=27017
+- Deploy te container
+
+*** Mongodb içindeki verileri görmek için, dýþarýdan bir program ile baðlanma ***
+- appsettings.json içindeki "ConnectionString": "mongodb://localhost:27017" deki adresi al. bu adresle baðlanamazsan adrese sadece localhost yaz. portu port tarafýnda yaz.
+
+*** Identity Server Kurulumu ***
+https://github.com/IdentityServer/IdentityServer4.Templates
+- dotnet new is4aspid olaný kuracaðýz.
+- dotnet new -i identityserver4.templates cmd ekranýnda bu templati yükle
+- projede dýþýnda bir klasör oluþtur
+- klasör içinde cmd ile konsolu aç ve  ------ dotnet new is4aspid --name IdentityServerProject ------ komutu çalýþtýr.
+- do you you want to run this action N yap
+- projenin içinde bir klasör oluþtur. üzerine sað týkla. Add - Exist projet yap ve yüklemiþ olduðun projeyi göster ve projenin içine import edecektir.
+
+*** Portainer SQL server yükleme ***
+- App Templates içinde SQL Server olarak arat
+- SQL Server in Linux olaný seçiyoruz.
+- Name=identitydb SApassword= Password*123
+- + Show advanced options ayarýna gir host=>1433 container=>1433 yap
+
+*** Identity Server kurulumu ve  Migration iþlemi ***
+- identity server içinde hazýr gelen Data içindeki Migration klasörünü sil
+- identity server içindeki appesttings.json içindeki ConnectionStrings i "DefaultConnection": "Server=localhost,1433;Database=IdentityDb; User=sa; Password=Password*123" olarak yaz
+- identity server içinde Nuget pakette 
+  Microsoft.EntityFrameworkCore.SqlServer
+  Microsoft.EntityFrameworkCore.Design yükle
+- startup içinde ekle. services.AddDbContext<ApplicationDbContext>(options =>options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+- Otomatik migration iþlemi yapmak için.
+- Program.cs dosyasýnýn içine aþaðýdakini ekle
+            try
+            {
+                var host = CreateHostBuilder(args).Build();
+
+                using (var scope = host.Services.CreateScope())
+                {
+                    var serviceProvider = scope.ServiceProvider;
+
+                    var applicationDbContext = serviceProvider.GetRequiredService<ApplicationDbContext>();
+
+                    applicationDbContext.Database.Migrate();
+
+                    var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+                    if (!userManager.Users.Any())
+                    {
+                        userManager.CreateAsync(new ApplicationUser { UserName = "caran", Email = "caran@gmail.com", City = "Ýstanbul" }, "Password*123").Wait();
+                    }
+                }
+
+                Log.Information("Starting host...");
+                host.Run();
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Host terminated unexpectedly.");
+                return 1;
+            }
+            finally
+            {
+                Log.CloseAndFlush();
+            }
+- Models klasörün içindeki ApplicationUser.cs içine eðer ekstra bir parametre eklemek istiyorsan bunun içine ekle
+- Package Manager Console dan IdentityServer projesini seç
+- Identityserver projesine sað týkla Set as Startup Project olarak seç. yoksa hata verir. 
+- projeyi mutlaka bir build yap. hata kontrolü yap.
+- enable-migrations yap
+- add-migration initial_caran yap ve migration klasörün içinde initial adýnda bir migration oluþtumu kontrol et.
+- update-database dememize gerek yok proje ayaða kalktýðýnda otomatik olarak ayarlayacak ama yinede yapabilirsin.
+- Endpointler http://localhost:5001/.well-known/openid-configuration
+
+*** identity server hakkýnda ***
+- Identityserver projesine sað týkla Set as Startup Project olarak seç
+- Resource Owner Credentials Grant Taype = Kullanýcýyla bilgilerini göndererek token alma iþlemi
+- Client = web sayfasý bilgilerini göndererek token alma iþlemi
+- Config.cs özelliði= identity serverden kimler token alacak, bir istek yapýldýðýnda clientid ve clientsecret hangi microservislere istek yapýlabilecek token üreteceði 
+- Token endpoint : https://identityserver4.readthedocs.io/en/latest/endpoints/token.html ile o sitenin tokenýný alabilirsin.
+
+
+
+*** DDD Domain Driven Design ***
+- Servislerden Order da bu yapıyı kullandık....
+- Projelerdeki karmaşıklığı çözmemizi imkan veren yaklalışımdır.
+- Projemizde çok fazla bussines kurala sahip ise. projemizde kolay şekilde uygulamak, yönetebilmek için kullanıyoruz.
+- Sadece CRUD operasyonu var ise bu dizayn kullanılmaz.
+- Her projeye uygun olmayabilir.
+- Ubiquitous Language = Muhasebeci ve Yazılımcı ortak dili kullanmalı. iki anlama gelecek yanlış anlama gelecek dil kullanılmamalı. 
+- Bounded Context = Bir ana domain içinde yer alan parçaları mantıksa olarak grupladığımız ilgi alanına göre bir araya getirdiğimiz yapılardır. Bir biriyle ilişki ilgili her alana Bounded Context deriz. Bir soulution içinde folder şeklinde ayırıyorsan bu bağımlılık 1. seviyedir. Eğer class library şeklinde ayırıyorsan bu bağımlılık seviyesi 2. seviyedir. Her bağımlığı ayrı bir microservis şeklindeyse bu bağımlılık seviyesi 3. seviyedir. 
+- Domain events= class library veya microservis vs... yapıların birbirleyle iletişim kullanması.
+- Anemic Domain Model= bildiğimiz klasik katmanlı mimarideki entity mantığında. Sadece propertity ler var. DDD de ise ayrı katmanlar yerine aynı yerde yönetiyoruz ve kuralları ilgili entity içinde tanımlıyoruz.
+- CQRS Pattern= veritabanına yapacağımız query ile crud işlemini ayırmamız.okuma için ayrı bir katman yazmak için ayrı bir katmanda yapıyoruz. CQRS kullanmak için MetiatR kütüphanesi kullanıyoruz.Bu kütüphane CQRS implementasyonu gerçekleştiryor ve inmemory olarak implementasyonu olarak kullanabiliyoruz. 
+
+*** API yi otomatik çalıştırma ***
+-web apideki launchSettings.json da şu şekilde ayar yap. özellikle launchBrowser i true yap.
+    "FreeCourse.Web": {
+      "commandName": "Project",
+      "dotnetRunMessages": "true",
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5010",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+- web api dışındaki tüm servisleri debug dan start without debuging ile ayağa kaldır. yani debugsuz ayağa kaldır.
+- web api sağ tık. open folder. cmd  ve içine dotnet watch run komutunu yaz. bu en küçük değişiklik yapıldığında otomatik olarak tekrar ayağa kaldıracak.Kendin play tuşuna basma. komut ile çalıştır.
+- dotnet watch run
+
+
+
+****** YENÝ BÝR MÝCROSERVÝCE EKLEME SIRASI ****
+1- klasörü doðru olacak þekilde. yeni bir wep api yükle.
+2- properties klasörün içindeki launchSettings.json dosyasýnýn içine þunu ekle
+    "FreeCourse.Services.Basket": {
+      "commandName": "Project",
+      "dotnetRunMessages": "true",
+      "launchBrowser": false,
+      "launchUrl": "swagger",
+      "applicationUrl": "http://localhost:5013",//çalıştırıldığında bu adresten açılacak localde.
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+3- Uygulamayý derle, kestrel þekilde bir ayaða kaldýr.
+4- http://localhost:5014/swagger/index.html þeklinde swager ayaktamý kontrol et.
+5- Nuget packages den gerekli programlarý yükle
+6- Dependencies den AddReferance lardan gerekli olanlarý baðla (shared mesela)
+7- Identity server config.cs dosyası içinde (ADIM SIRASI IDENTITYSERVER Config.cs içindede var.) 
+
+	- Nuget packages den Microsoft.AspNetCore.Authentication.JwtBearer
+
+	- ApiScopes kýsmýna þunu ekle
+		new ApiScope("basket_fullpermission","Basket API için full erişim"),
+
+	- ApiResources kýsmýna þunu ekle
+		new ApiResource("resource_basket"){Scopes={"basket_fullpermission"}},
+
+    - Clients kýsmýna AllowedSopes kýsmýna þunu ekle AllowedGrantTypes= GrantTypes.ResourceOwnerPassword olan client kısmına yaz
+		"basket_fullpermission",,
+
+	- Basket projenin  startubuna ConfigureServices içine ekle
+	    var requireAuthorizePolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();//*** AuthorizationPolicyBuilder eğer üyelik sistemi varsa üye olmayanlar için eriþim engeli koyar.
+        JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Remove("sub");//token içindeki bilgiyi clientid yi sub olarak göster.
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+        {
+            options.Authority = Configuration["IdentityServerURL"];
+            options.Audience = "resource_basket";
+            options.RequireHttpsMetadata = false;
+        });
+	
+	    services.AddControllers(opt =>
+		{
+        opt.Filters.Add(new AuthorizeFilter(requireAuthorizePolicy));
+		});
+
+	- Basket projenin startubundaki Configure içine aşağıdakilerini ekle
+		app.UseAuthentication();
+		app.UseAuthorization();
+
+	- Basket projenin appestings.json içine ekle
+		"IdentityServerURL": "http://localhost:5001",
+
+	- projeyi derleyip çalıştarabilirsin.
+
+	- Herşey doğru ise tokenin içine açınca Aud: basket_catalog ve Scope:basket_fullpermission u görmen gerekiyor. Eğer bunları görüyorsan. Koruma altına alımış demektir.
+
+
+****** GATEWAY İŞLEMLERİ ******
+	- Projeyi kurarken ASP.NET Core Empty olanı seç. full dolu olanı yapi wepapi olanı seçme.
+	***** Ocelot kurulumu  *****
+	- Nudget packeges den Ocelot di yükle
+	- startup ConfigureServices içine 
+		services.AddOcelot();
+		await app.UseOcelot(); // public void Configure önüne async eklemeyi unutma 
+		async public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+	- projeyi sağ tıkla add- newitem - App SettingsFile olarak şu dosyaları ekle
+		configuration.development.json ve configuration.production.json adında iki dosya oluştur. appsetting.json ile aynı yerde olmalı
+	- program.cs CreateHostBuilder içini aşağıdaki gibi değiştir.
+	    Host.CreateDefaultBuilder(args).ConfigureAppConfiguration((hostingContext, config) =>//OCELOT tanımlamak için burayı düzenledik.
+        {
+            config.AddJsonFile($"configuration.{hostingContext.HostingEnvironment.EnvironmentName.ToLower()}.json").AddEnvironmentVariables();//$"configuration=senin oluşturduğun configuration.development.json ve configuration.production.json dosyalarına ulaşmak için
+        })
+        .ConfigureWebHostDefaults(webBuilder =>
+        {
+            webBuilder.UseStartup<Startup>();
+        });
+	- diğer gerekli ayarlamaları configuration.development.json ve configuration.production.json içinde yaptım.
+	- ilgili projeyi ocelota bağlamak için Program.cs ye git ve Main içine şunu yaz.
+
+	    public static void Main(string[] args)
+        {
+            var host = CreateHostBuilder(args).Build();
+
+            using (var scope = host.Services.CreateScope())
+            {
+                var serviceProvider = scope.ServiceProvider;
+
+                var categoryService = serviceProvider.GetRequiredService<ICategoryService>();//var categoryService ve ICategoryService değiştirilecek
+
+                if (!categoryService.GetAllAsync().Result.Data.Any())//eğer dizi boş geliyorsa iki tane kategory ekle
+                {
+                    categoryService.CreateAsync(new CategoryDto { Name = "Asp.net Core Kursu" }).Wait();//projene uygun servis eklemeyi yap
+                    categoryService.CreateAsync(new CategoryDto { Name = "Asp.net Core API Kursu" }).Wait();
+                }
+            }
+
+            host.Run();
+        }
+
+****** RABBITMQ *******
+- MassTransit framework
+- https://masstransit.io/documentation/concepts
+- Tek bir microservise veri göndermek için send yani command kullanılır.
+- Birden fazla microservise veri göndermek için publish yani event kullanılır.
+- nudget package manager console içinde MassTransit.AspNetCore ve MassTransit.RabbitMQ kurduk
+- Shared klasörün içindeki Messages klasörün içinde CourenMaChangeEvent.cs ve CreateOrderMessageCommond.cs olarak tanımları yaptık yani Event ve Command ları tanımladık.
+- ISend ve IPublish arasındaki fark ISend tek bir microservise veri gönderir. IPublish birden fazla microservise veri gönderir.
+- Receiver ve Publisher aynı Shared library kullanılmalı olmalı.ikiside aynı yerde olmalı yoksa çalışmaz.
+- Gerekli diğer bilgileri CreateOrderMessageCommand de anlattık.
+
+- Kuyruğu dinleyencek applican kısımı Serices den Oreder klasörün içinde Order.API içinde Order.Application içinde Consumer klasörün içinde CreateOrderMessageCommandConsumer.cs olarak tanımladık.
+- RabbitMQ templateni oluşturmak için cmd ekranında  docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.11-management komutu ile templateni oluşturabilirsin.
+
+*** DOCKER DAKİ CONTAİNERLERİ GÖSTEREN İMAGE ***
+- Services içinde PhotoStock içinde wwwroot içinde photos içinde docker containerler.png olarak kaydettim. 
+- https://hub.docker.com/_/microsoft-dotnet
+
+
+*** JENKİNS KURULUMU ***
+- https://faun.pub/how-to-install-docker-in-jenkins-container-4c49ba40b373 adresinden jenkins kurulumu yapıldı.
+- docker run -p 8080:8080 -p 50000:50000 -d -v /var/run/docker.sock:/var/run/docker.sock -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts komutuyla jenkinsi kur
+- docker ps -a veya docker ps komutuyla jenkinsin çalışıp çalışmadığını kontrol et ve container id sini kopyala
+- docker exec -it --user root <container id> bash komutuyla jenkinsin içine gir. Örnek= docker exec -it --user root 40cd6b171c8d bash
+- curl https://get.docker.com/ > dockerinstall && chmod 777 dockerinstall && ./dockerinstall komutuyla docker kurulumunu yap
+- sudo chmod 666 /var/run/docker.sock
+- docker-compose yüklemeye başlıyoruz
+- sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose 
+- sudo chmod +x /usr/local/bin/docker-compose
+- docker-compose --version komutuyla docker compose versiyonunu kontrol et docker-compose yüklenmişmi diye.
+- https://ip adresi:8080 adresine git ve jenkinsin şifresini gir. şifreyi= docker logs komutuyla jenkinsin içindeki şifreyi öğrenebilirsin. log içinde Please use the following password to proceed to installation: yazan yerdeki şifreyi kopyala
+- şifreyi öğrenmenin ikinci yolu
+- docker exec -it <container id> bash cat var/jenkins_home/secrets/initialAdminPassword komutuyla jenkinsin içindeki şifreyi öğrenebilirsin.
+- şifreyi kopyaladıktan sonra açılan jekinsin içindeki  kutuya yapıştır ve continue a bas.
+- Install suggested plugins e bas.
+- admin kullanıcısını oluştur ve save and continue a bas.
+- girdikten sonra jenkinsin url ni verir. http://ipadresi:8080/ adresine git ve jenkinsin şifresini gir.
+- Manage Jenkins den Plugin Manager a git ve github arat. Generic Webhook Trigger, GitHub Integration, GitHub Authentication seç ve plugleri kur.
+- Jenkinsin tekrar çalıştır. kullanıcı adı ve şifreni gir.
+- Sol alt tarafta Ok tuşuna bas veya Soldan New Item a tıkla ve freestyle project seç.
+- Dashboard->berker->test-configuration kısmından Configure kısımına git.
+- GitHub project kısmına github projesinin url sini kopyala.
+- Source Code Management kısmından git seç ve Repository URL kısmına github projesinin url sini yapıştır.
+- Branches to build kısmından Branch Specifier (blank for 'any') kısmına master yaz.
+- Build Steps kısmından Add build step seç ve Execute shell seç.
+- Command kısmına docker-compose build ve alt satıra docker-compose up -d yaz.
+- Save a bas.
+- Build Now a bas. çalıştır. eğer proje COMMİT İLE OTOMATİK çalışsın diyorsan. aşağıdaki adımları yap.
+- GitHub projesinin içindeki settings kısmına git.
+- webhook kısmına git ve Add webhook a bas.
+- Payload URL kısmına jenkinsin urli/github-webhook/ yaz.Örnek= www.berkeryildirim.com:8080/github-webhook/
+- Which events would you like to trigger this webhook? kısmından Just the push event. seç.
+- Active seç.
+- Add webhook a bas.
+- Jenkins kısmına geç
+- Configure kısmına git.
+- Build Triggers kısmından, GitHub hook trigger for GITScm polling seç
+- Save a bas.
+- Projende commit ve push yap. Jenkinsin çalıştığını göreceksin.
+- Not: Master, developer, test gibi branchlerde webhook oluşturman gerekiyor. ve pipeline kısmından yapıyorsun.
+
+2.yol
+- https://faun.pub/how-to-install-docker-in-jenkins-container-4c49ba40b373 adresinden jenkins kurulumu yapıldı.
+- docker run -p 8080:8080 -p 50000:50000 -d -v /var/run/docker.sock:/var/run/docker.sock -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts komutuyla jenkinsi kur
+- docker ps -a komutuyla jenkinsin çalışıp çalışmadığını kontrol et
+- docker exec -it jenkins bash komutuyla jenkinsin içine gir
+- cat /var/jenkins_home/secrets/initialAdminPassword komutuyla jenkinsin şifresini öğren
+- http://localhost:8080/ adresine git ve jenkinsin şifresini gir
+- jenkinsin içindeki pluginlerden docker ve docker pipeline pluginlerini kur
+- jenkinsin içindeki global tool configuration dan docker kurulumunu yap
+- jenkinsin içindeki new item dan pipeline oluştur
+- pipeline içindeki pipeline script from scm kısmına git ve github seç
+- repository url kısmına
+
+
+*** REDİS TEMPLATE KURULUMU ***
+**1. yol **
+1-İlk olarak, Node.js'in yüklü olduğundan emin olun. Node.js'i bilgisayarınıza indirmek ve yüklemek için Node.js'in resmi web sitesini ziyaret edebilirsiniz: Node.js İndirme Sayfası
+2-Ardından, terminali veya komut istemcisini açın ve aşağıdaki komutu kullanarak RedisCommander'ı yükleyin:
+3-npm install -g redis-commander
+4-RedisCommander başarıyla yüklendikten sonra, terminalde aşağıdaki komutu kullanarak RedisCommander'ı başlatın:
+5-redis-commander
+6-RedisCommander başlatıldığında, varsayılan olarak tarayıcınızda http://localhost:8081 adresi açılacak ve RedisCommander'ın web arayüzü görüntülenecektir.
+7-Web arayüzünde, Redis sunucularınızı eklemek için "Add Connection" düğmesini tıklayın.
+8-Açılan pencerede Redis sunucusunun IP adresini, port numarasını ve gerektiği durumlarda kimlik doğrulama bilgilerini (örneğin, parola) girmeniz gerekecektir.
+9-Bilgileri girdikten sonra, "Save" düğmesini tıklayarak Redis sunucusuna bağlanın.
+10-RedisCommander, Redis sunucusuna başarıyla bağlandıktan sonra sunucunun durumunu, anahtarları, değerleri, istatistikleri vb. görüntüleyebilirsiniz.
+11-RedisCommander, Redis sunucularını yönetmek için birçok özelliğe sahiptir. Anahtarları arayabilir, değerleri düzenleyebilir, yeni anahtarlar ekleyebilir ve daha fazlasını yapabilirsiniz.
+
+Bu şekilde, RedisCommander aracılığıyla Redis sunucunuzu tarayıcı üzerinden izleyebilir ve yönetebilirsiniz.
+
+
+** 2. yol **
+1-İlk olarak, RedisInsight'i bilgisayarınıza indirin ve yükleyin. RedisInsight'in resmi web sitesi üzerinden indirme sayfasına erişebilirsiniz: RedisInsight İndirme Sayfası
+2-RedisInsight'i başlatın ve web tarayıcınızı açın.
+3-RedisInsight'in web arayüzüne giriş yapmak için tarayıcınızın adres çubuğuna http://localhost:8001 veya RedisInsight'in kurulu olduğu IP adresi ve port numarasını yazın.
+4-Web tarayıcınızda RedisInsight arayüzü açıldığında, Redis sunucularınızı eklemek için "Add Redis Connection" düğmesini tıklayın.
+5-Açılan pencerede Redis sunucusunun IP adresini, port numarasını ve gerektiği durumlarda kimlik doğrulama bilgilerini (örneğin, parola) girmeniz gerekecektir.
+6-Bilgileri girdikten sonra, "Connect" düğmesini tıklayarak Redis sunucusuna bağlanın.
+7-RedisInsight, Redis sunucusuna bağlandıktan sonra sunucunun durumunu, istatistiklerini, anahtarları, değerleri ve diğer bilgileri görüntülemek için kullanabileceğiniz bir arayüz sunacaktır
+
+
+
+****** DOCKER COMPOSE ******
+- docker-compose.yml dosyası temel ayarlar yapılır. Örnek mongodb imajını burada belirtiriz.
+- docker-compose.override.yml dosyası ise geliştirme ortamında kullanılır.Ayağa kalacak container hangi portta çalışacak gibi ayarlar yapılır.
+- Kök klasörüne yani en dışa docker-compose.yml ve docker-compose.override.yml dosyalarını oluştur.
+- gerekli açıklamaları orada yaptık.
+- test etmek için sadece portainer ayakta kalsın diğerlerini sil. otamatik olarak oluşturulur.
+- klasörün içinde cmd yap ve dockeri ayağa kaldırmak için docker-compose up -d komutunu kullan. veya
+- Tools - Command Line - Developer Command Prompt for VS 2019 - docker-compose up -d komutunu kullan.
+- docker-compose up -d --build
+- docker-compose up -d
+- docker-compose down
+- docker-compose start
+- docker-compose stop
+
+
+
+
+
+
+
+
+****** POSTMAN YEDEK Microservice-E-commers.postman_collection.json *******
+{
+	"info": {
+		"_postman_id": "35dd3357-51ef-4c2c-b850-d1010eecf4c6",
+		"name": "Microservice-E-commers",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Tüm endpointler",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "http://localhost:5001/.well-known/openid-configuration"
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "WebMvcClientForUser",
+							"type": "default"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "default"
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "default"
+						},
+						{
+							"key": "username",
+							"value": "caran2@gmail.com",
+							"type": "default"
+						},
+						{
+							"key": "Password",
+							"value": "Password*12",
+							"type": "default"
+						}
+					]
+				},
+				"url": "http://localhost:5001/connect/token"
+			},
+			"response": []
+		},
+		{
+			"name": "Token ile User Bilgilerini alma",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://localhost:5001/connect/userinfo"
+			},
+			"response": []
+		},
+		{
+			"name": "Client Token alma",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "WebMvcClient",
+							"type": "default"
+						},
+						{
+							"key": "grant_type",
+							"value": "client_credentials",
+							"type": "default"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "default"
+						},
+						{
+							"key": "scope",
+							"value": "identityserver",
+							"type": "default",
+							"disabled": true
+						},
+						{
+							"key": "Password",
+							"value": "Password*12",
+							"type": "default",
+							"disabled": true
+						}
+					]
+				},
+				"url": "http://localhost:5001/connect/token"
+			},
+			"response": []
+		},
+		{
+			"name": "Yeni User Kaydetme",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"UserName\":\"caran2\",\r\n    \"Email\":\"caran2@gmail.com\",\r\n    \"Password\":\"Password*12\",\r\n    \"City\":\"Aydın\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://localhost:5001/api/user/signup"
+			},
+			"response": []
+		},
+		{
+			"name": "Categories GetAll",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"redirect_uri": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjlDMDIyODU5ODRENkNGQUREMTgxMDc5RDJDNkE1MDAxIiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODMxODY1MjUsImV4cCI6MTY4MzE5MDEyNSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo1MDAxIiwiYXVkIjpbInJlc291cmNlX2Jhc2tldCIsInJlc291cmNlX2Rpc2NvdW50IiwicmVzb3VyY2VfZ2F0ZXdheSIsInJlc291cmNlX29yZGVyIiwicmVzb3VyY2VfcGF5bWVudCIsImh0dHA6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiV2ViTXZjQ2xpZW50Rm9yVXNlciIsInN1YiI6IjQxNDVlZDY1LWMxYzgtNDBhNS05MTI5LTYxYzJlZDVlZTc1OCIsImF1dGhfdGltZSI6MTY4MzE4NjUyNSwiaWRwIjoibG9jYWwiLCJqdGkiOiJBQ0FERjdEMzYxOTlFMDlERjYzQjFDRDZEMjM1NDk5NiIsImlhdCI6MTY4MzE4NjUyNSwic2NvcGUiOlsiYmFza2V0X2Z1bGxwZXJtaXNzaW9uIiwiZGlzY291bnRfZnVsbHBlcm1pc3Npb24iLCJlbWFpbCIsImdhdGV3YXlfZnVsbHBlcm1pc3Npb24iLCJJZGVudGl0eVNlcnZlckFwaSIsIm9wZW5pZCIsIm9yZGVyX2Z1bGxwZXJtaXNzaW9uIiwicGF5bWVudF9mdWxscGVybWlzc2lvbiIsInByb2ZpbGUiLCJyb2xlcyIsIm9mZmxpbmVfYWNjZXNzIl0sImFtciI6WyJwd2QiXX0.ZrCNoubMy7vD2N4Et_alitGAmp9xTV9REMQwjXy_jvHmMh9KxPtClDJt4nut1ycT6el6BCpTL2cIt2uG_-aUw0o7qZ_0csQ5WCI4zRueTNcEQP1h2v62-Zb3P8WK4O5E2uLcAnlhl9MJZQU06ff4gxjEE9b6QPdV6r6ZbIn6p3BxbKpkDujYK3eObQIxvQblGbsL6468KPUXvOzXCKQ61PLE4eqsRWcU3fvFd4u3J_NqaqXhxg8KZ6a3IpvdyEWOmRkxLi-PGsG9yJ9hzBYYjjvbudiesRphNeYFCXjt44MxQAFSRzHw6xF9Z9594J7WI6bp7HzonodBOUpSzT1uug",
+						"tokenType": "",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://localhost:5011/api/categories"
+			},
+			"response": []
+		},
+		{
+			"name": "Token ile user bilgilerini çekmek",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"accessToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjlDMDIyODU5ODRENkNGQUREMTgxMDc5RDJDNkE1MDAxIiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODI2MDI3MTQsImV4cCI6MTY4MjYwNjMxNCwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo1MDAxIiwiYXVkIjpbInJlc291cmNlX2Jhc2tldCIsInJlc291cmNlX2dhdGV3YXkiLCJyZXNvdXJjZV9vcmRlciIsImh0dHA6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiV2ViTXZjQ2xpZW50Rm9yVXNlciIsInN1YiI6IjQxNDVlZDY1LWMxYzgtNDBhNS05MTI5LTYxYzJlZDVlZTc1OCIsImF1dGhfdGltZSI6MTY4MjYwMjcxNCwiaWRwIjoibG9jYWwiLCJqdGkiOiIxQzM4RTdEMzY2RjQwREY1MEMyRDZBQTA1QzQzODZCQyIsImlhdCI6MTY4MjYwMjcxNCwic2NvcGUiOlsiYmFza2V0X2Z1bGxwZXJtaXNzaW9uIiwiZW1haWwiLCJnYXRld2F5X2Z1bGxwZXJtaXNzaW9uIiwiSWRlbnRpdHlTZXJ2ZXJBcGkiLCJvcGVuaWQiLCJvcmRlcl9mdWxscGVybWlzc2lvbiIsInByb2ZpbGUiLCJyb2xlcyIsIm9mZmxpbmVfYWNjZXNzIl0sImFtciI6WyJwd2QiXX0.NLz-RCqXAeLZTNXhfP66FlkcnButs_z5--u_V2hb1w5H8PFZ8L6axMh1eMKv5gxMJCLkj9sFK24A8Y1k0_dBboPEh_5sc1NxkYEHzPk_86118FkkwN0UkicgPrRYlkkq3RZ0P1eXL-z8Ci_x4KADG1WWMmYM-IEI5rQBWm2mB2eX8qzb55rvgMxHecS7oA2Qcc9UEANUKcuNew4hm4FMXgrdgLoaxdm4GcX7INoF69onr5X2EaAmVbfe3d4Xva2Ko1772Etq-pvvEcEJcBhx9Jyl42qS5Si1wMfEVHZUTIGikqUFCHHP2fvf46i04l-k9bB1pmzLfVothW8AodV8Jg",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "WebMvcClientForUser",
+							"type": "default",
+							"disabled": true
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "default",
+							"disabled": true
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "default",
+							"disabled": true
+						},
+						{
+							"key": "username",
+							"value": "caran2@gmail.com",
+							"type": "default",
+							"disabled": true
+						},
+						{
+							"key": "Password",
+							"value": "Password*12",
+							"type": "default",
+							"disabled": true
+						}
+					]
+				},
+				"url": "http://localhost:5001/api/user/getuser"
+			},
+			"response": []
+		},
+		{
+			"name": "Resim yükleme",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "photo",
+							"type": "file",
+							"src": "/C:/Users/Beykent/Desktop/aaa_SOYAĞACI FOTOOOO/c1.jpg"
+						}
+					]
+				},
+				"url": "http://localhost:5012/api/photos"
+			},
+			"response": []
+		},
+		{
+			"name": "Resim Silme",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "photo",
+							"value": "c6.jpg",
+							"type": "default"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:5012/api/photos?photoUrl=c6.jpg",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5012",
+					"path": [
+						"api",
+						"photos"
+					],
+					"query": [
+						{
+							"key": "photoUrl",
+							"value": "c6.jpg"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Basket Get",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://localhost:5013/api/baskets"
+			},
+			"response": []
+		},
+		{
+			"name": "Basket Post",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userId\": \"4145ed65-c1c8-40a5-9129-61c2ed5ee758\",\r\n  \"discountCode\": \"\",\r\n  \"discountRate\": 0,\r\n  \"basketItems\": [\r\n    {\r\n      \"quantity\": 1,\r\n      \"courseId\": \"123\",\r\n      \"courseName\": \"asp.net core 2\",\r\n      \"price\": 11.22\r\n    },\r\n        {\r\n      \"quantity\": 100,\r\n      \"courseId\": \"12300\",\r\n      \"courseName\": \"asp.net core 200\",\r\n      \"price\": 11.2200\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://localhost:5013/api/baskets"
+			},
+			"response": []
+		},
+		{
+			"name": "Basket Delete",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "DELETE",
+				"header": [],
+				"url": "http://localhost:5013/api/baskets"
+			},
+			"response": []
+		},
+		{
+			"name": "Discount Code",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"UserId\":\"123\",\r\n    \"Rate\":\"10\",\r\n    \"Code\":\"ABC\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://localhost:5014/api/discounts"
+			},
+			"response": []
+		},
+		{
+			"name": "Discount GetAll",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://localhost:5014/api/discounts"
+			},
+			"response": []
+		},
+		{
+			"name": "Discount GetById",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://localhost:5014/api/discounts/2"
+			},
+			"response": []
+		},
+		{
+			"name": "Discount Update",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{    \r\n    \"Id\":2,\r\n    \"UserId\":\"123\",\r\n    \"Rate\":\"10\",\r\n    \"Code\":\"EEE\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://localhost:5014/api/discounts"
+			},
+			"response": []
+		},
+		{
+			"name": "Discount Delete",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://localhost:5014/api/discounts/2"
+			},
+			"response": []
+		},
+		{
+			"name": "Discount get Code",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{    \r\n    \"UserId\":\"123\",\r\n    \"Rate\":\"10\",\r\n    \"Code\":\"ABC\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://localhost:5014/api/discounts/GetByCode/CDE"
+			},
+			"response": []
+		},
+		{
+			"name": "Orders GetAll",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://localhost:5015/api/orders"
+			},
+			"response": []
+		},
+		{
+			"name": "Orders Post",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"tokenType": "",
+						"redirect_uri": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5QkEwQ0NENkNDRkYyRjgzOTQ0OEEzRDNDRkU5ODQ4IiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODAyNTI1NDYsImV4cCI6MTY4MDI1OTc0NiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMSIsImF1ZCI6WyJyZXNvdXJjZV9hcGkxIiwiaHR0cHM6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiQ2xpZW50MS1SZXNvdXJjZU93bmVyLU12YyIsInN1YiI6ImM5ZTY5MWU5LTUwYWYtNDNjMS1hYWZjLTRkOTY5OTg2ZjY0ZCIsImF1dGhfdGltZSI6MTY4MDI1MjU0NiwiaWRwIjoibG9jYWwiLCJqdGkiOiI4RTIzMTBEQkQzRUM2RUZGRjlFRDc0RTYxQTM1NDRCNCIsImlhdCI6MTY4MDI1MjU0Niwic2NvcGUiOlsiYXBpMS5yZWFkIiwiQ291bnRyeUFuZENpdHkiLCJlbWFpbCIsIklkZW50aXR5U2VydmVyQXBpIiwib3BlbmlkIiwicHJvZmlsZSIsIlJvbGVzIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdfQ.sd9iaSK6JiDoMtssGZk5j0GMWZggLauAQlZFX66rWAnkqky4Ecub3plYQz6S9q_tuTVgLu8O2sU0AJnPkG__LJIMRID8fWjHIHJwGjK2ZKTEyjcN36A-kcKXGWVN35TbdvDID-Sbpctr6jstWkCYPK1QAB9nnDqde3eoXFOb-yPOdetTX4--rpHOGYD-CW5xjpOMLn8N_UAZ_8FsMCmELJswwtb7ndn-oj-xQygbf01FcC7qybVfxIMSoZMFgnkeKN-kqLrFN9TLRtJODd3KKRI45VZwlUT6W5x0O5AKvT96tVlWHtR-DxVgV29a1E1h-a9XGn8YUk2dYu9EFZxlMw\n.Token.refresh_token\t549BEE5D497397A8B767078CC723D31895B351EBBC76C25C3A58E62E75703395",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"buyerId\": \"4145ed65-c1c8-40a5-9129-61c2ed5ee758\",\r\n  \"orderItems\": [\r\n    {\r\n      \"productId\": \"1\",\r\n      \"productName\": \"Asp.Net Core\",\r\n      \"pictureUrl\": \"Yok\",\r\n      \"price\": 100\r\n    },\r\n        {\r\n      \"productId\": \"2\",\r\n      \"productName\": \"Asp.Net Core 2\",\r\n      \"pictureUrl\": \"Yok 2\",\r\n      \"price\": 200\r\n    }\r\n  ],\r\n  \"address\": {\r\n    \"province\": \"a\",\r\n    \"district\": \"a\",\r\n    \"street\": \"a\",\r\n    \"zipCode\": \"a\",\r\n    \"line\": \"a\"\r\n  }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://localhost:5015/api/orders"
+			},
+			"response": []
+		},
+		{
+			"name": "Fake Payments",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"redirect_uri": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjlDMDIyODU5ODRENkNGQUREMTgxMDc5RDJDNkE1MDAxIiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODMxODY1MjUsImV4cCI6MTY4MzE5MDEyNSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo1MDAxIiwiYXVkIjpbInJlc291cmNlX2Jhc2tldCIsInJlc291cmNlX2Rpc2NvdW50IiwicmVzb3VyY2VfZ2F0ZXdheSIsInJlc291cmNlX29yZGVyIiwicmVzb3VyY2VfcGF5bWVudCIsImh0dHA6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiV2ViTXZjQ2xpZW50Rm9yVXNlciIsInN1YiI6IjQxNDVlZDY1LWMxYzgtNDBhNS05MTI5LTYxYzJlZDVlZTc1OCIsImF1dGhfdGltZSI6MTY4MzE4NjUyNSwiaWRwIjoibG9jYWwiLCJqdGkiOiJBQ0FERjdEMzYxOTlFMDlERjYzQjFDRDZEMjM1NDk5NiIsImlhdCI6MTY4MzE4NjUyNSwic2NvcGUiOlsiYmFza2V0X2Z1bGxwZXJtaXNzaW9uIiwiZGlzY291bnRfZnVsbHBlcm1pc3Npb24iLCJlbWFpbCIsImdhdGV3YXlfZnVsbHBlcm1pc3Npb24iLCJJZGVudGl0eVNlcnZlckFwaSIsIm9wZW5pZCIsIm9yZGVyX2Z1bGxwZXJtaXNzaW9uIiwicGF5bWVudF9mdWxscGVybWlzc2lvbiIsInByb2ZpbGUiLCJyb2xlcyIsIm9mZmxpbmVfYWNjZXNzIl0sImFtciI6WyJwd2QiXX0.ZrCNoubMy7vD2N4Et_alitGAmp9xTV9REMQwjXy_jvHmMh9KxPtClDJt4nut1ycT6el6BCpTL2cIt2uG_-aUw0o7qZ_0csQ5WCI4zRueTNcEQP1h2v62-Zb3P8WK4O5E2uLcAnlhl9MJZQU06ff4gxjEE9b6QPdV6r6ZbIn6p3BxbKpkDujYK3eObQIxvQblGbsL6468KPUXvOzXCKQ61PLE4eqsRWcU3fvFd4u3J_NqaqXhxg8KZ6a3IpvdyEWOmRkxLi-PGsG9yJ9hzBYYjjvbudiesRphNeYFCXjt44MxQAFSRzHw6xF9Z9594J7WI6bp7HzonodBOUpSzT1uug",
+						"tokenType": "",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": "http://localhost:5016/api/fakepayments"
+			},
+			"response": []
+		},
+		{
+			"name": "Ocelot Categories GetAll",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": {
+						"redirect_uri": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjlDMDIyODU5ODRENkNGQUREMTgxMDc5RDJDNkE1MDAxIiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2ODMxODY1MjUsImV4cCI6MTY4MzE5MDEyNSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo1MDAxIiwiYXVkIjpbInJlc291cmNlX2Jhc2tldCIsInJlc291cmNlX2Rpc2NvdW50IiwicmVzb3VyY2VfZ2F0ZXdheSIsInJlc291cmNlX29yZGVyIiwicmVzb3VyY2VfcGF5bWVudCIsImh0dHA6Ly9sb2NhbGhvc3Q6NTAwMS9yZXNvdXJjZXMiXSwiY2xpZW50X2lkIjoiV2ViTXZjQ2xpZW50Rm9yVXNlciIsInN1YiI6IjQxNDVlZDY1LWMxYzgtNDBhNS05MTI5LTYxYzJlZDVlZTc1OCIsImF1dGhfdGltZSI6MTY4MzE4NjUyNSwiaWRwIjoibG9jYWwiLCJqdGkiOiJBQ0FERjdEMzYxOTlFMDlERjYzQjFDRDZEMjM1NDk5NiIsImlhdCI6MTY4MzE4NjUyNSwic2NvcGUiOlsiYmFza2V0X2Z1bGxwZXJtaXNzaW9uIiwiZGlzY291bnRfZnVsbHBlcm1pc3Npb24iLCJlbWFpbCIsImdhdGV3YXlfZnVsbHBlcm1pc3Npb24iLCJJZGVudGl0eVNlcnZlckFwaSIsIm9wZW5pZCIsIm9yZGVyX2Z1bGxwZXJtaXNzaW9uIiwicGF5bWVudF9mdWxscGVybWlzc2lvbiIsInByb2ZpbGUiLCJyb2xlcyIsIm9mZmxpbmVfYWNjZXNzIl0sImFtciI6WyJwd2QiXX0.ZrCNoubMy7vD2N4Et_alitGAmp9xTV9REMQwjXy_jvHmMh9KxPtClDJt4nut1ycT6el6BCpTL2cIt2uG_-aUw0o7qZ_0csQ5WCI4zRueTNcEQP1h2v62-Zb3P8WK4O5E2uLcAnlhl9MJZQU06ff4gxjEE9b6QPdV6r6ZbIn6p3BxbKpkDujYK3eObQIxvQblGbsL6468KPUXvOzXCKQ61PLE4eqsRWcU3fvFd4u3J_NqaqXhxg8KZ6a3IpvdyEWOmRkxLi-PGsG9yJ9hzBYYjjvbudiesRphNeYFCXjt44MxQAFSRzHw6xF9Z9594J7WI6bp7HzonodBOUpSzT1uug",
+						"tokenType": "",
+						"headerPrefix": "Bearer",
+						"addTokenTo": "header"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://localhost:5000/services/catalog/categories"
+			},
+			"response": []
+		}
+	]
+}

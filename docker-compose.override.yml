@@ -1,0 +1,155 @@
+# docker-compose.yml daki başlıkların ayrıntılı şekilde burda tanımlıyoruz
+# test etmek için sadece portainer ayakta kalsın diğerlerini sil. otamatik olarak oluşturulur.
+version: "3.8"
+services:
+  catalogdb: # docker-copose.yml deki container ismi
+    container_name: catalogdb # container ismi
+    restart: always # her zaman çalıştır
+    ports: 
+      - "27017:27017" # port numarası. port numarasını öğrenmek için. appsettings.json da ki port numarasını yazıyor. oradan alıyoruz.
+    volumes:
+      - catalogdb_volume:/data/db # cantainer içindeki data içindeki db klasörüne yazıyor.  catagodb_volume bu ismi docker-compose.yml deki volume ile aynı olmalı
+  basketdb: # docker-copose.yml deki container ismi
+    container_name: basketdb
+    restart: always
+    ports:
+      - "6379:6379"
+  discountdb: # docker-copose.yml deki container ismi
+    container_name: discountdb
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - discount_volume:/var/lib/postgresql/data # discount_volume bu ismi docker-compose.yml deki volume ile aynı olmalı
+    environment:
+      - POSTGRES_USER=admin # postgresql deki kullanıcı adı
+      - POSTGRES_PASSWORD=Password12* # postgresql deki şifre
+      - POSTGRES_DB=discountdb # postgresql deki database adı
+  identitydb: # docker-copose.yml deki container ismi
+    container_name: identitydb
+    restart: always
+    ports:
+      - "1433:1433"
+    volumes:
+      - identitydb_volume:/var/opt/mssql
+    environment:
+      - ACCEPT_EULA=Y # kabul et
+      - SA_PASSWORD=Password12* # şifre
+  orderdb: # docker-copose.yml deki container ismi
+    container_name: orderdb
+    restart: always
+    ports:
+      - "1444:1433"
+    volumes:
+      - orderdb_volume:/var/opt/mssql
+    environment:
+      - ACCEPT_EULA=Y # kabul et
+      - SA_PASSWORD=Password12* # şifre
+  rabbitmq:
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672" # rabbitmq port numarası
+      - "15672:15672" # rabbitmq management port numarası
+  catalog.api:
+    container_name: catalog.api
+    environment: # appsettings.json daki değerleri burda ezeceğiz. appsettigns.json daki isimlerle aynı olmalı
+      - ASPNETCORE_ENVIRONMENT=Development # geliştirme ortamı
+      - RabbitMQUrl=rabbitmq # rabbitmq ye bağlanıyor
+      - IdentityServerURL=http://identityserver.api # identityserver.api ye bağlanıyor
+      - DatabaseSettings:ConnectionString=mongodb://catalogdb:27017 # mongodb bağlantı cümlesi.appsettings.json daki içi içe içeri girerek yolunu belirliyoruz
+    ports:
+      - "5011:80" # port numarası. port numarasını öğrenmek için. appsettings.json da ki port numarasını yazıyor. oradan alıyoruz.
+    depends_on: # bağımlılıklar. catalogdb çalışmadan catalog.api çalışmaz. Bu container ayağa kalmadan önce catalogdb ayağa kalksın diyoruz
+      - catalogdb
+  identityserver.api: # identityserver.api container ı
+    container_name: identityserver.api # container ismi
+    restart: on-failure # hata olursa veya container down olursa tekrar başlat
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development # geliştirme ortamı
+      - "ConnectionStrings:DefaultConnection=Server=identitydb,1433;Database=IdentityDb; User=sa; Password=Password12*" # sql server bağlantı cümlesi
+    ports:
+      - "5001:80" # port numarası. port numarasını öğrenmek için. appsettings.json da ki port numarasını yazıyor. oradan alıyoruz.
+    depends_on:
+      - identitydb # bağımlılıklar. identitydb çalışmadan identityserver.api çalışmaz. Bu container ayağa kalmadan önce identitydb ayağa kalksın diyoruz
+  basket.api:
+    container_name: basket.api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development # geliştirme ortamı
+      - IdentityServerURL=http://identityserver.api # identityserver.api ye bağlanıyor
+      - RedisSettings:Port=6379
+      - RedisSettings:Host=basketdb
+    ports:
+      - "5013:80"
+    depends_on:
+      - basketdb
+  photostock.api: 
+    container_name: photostock.api # container ismi
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - IdentityServerURL=http://identityserver.api
+    ports:
+      - "5012:80"
+    volumes:
+      - type: bind # bind ile dosya paylaşımı yapıyoruz. host ile container arasında dosya paylaşımı yapıyoruz. 
+        source: C:\Users\Beykent\Desktop\photos # host tarafındaki dosya yolu
+        target: /app/wwwroot/photos # container tarafındaki dosya yolu
+  discount.api:
+    container_name: discount.api # container ismi
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development # geliştirme ortamı
+      - IdentityServerURL=http://identityserver.api # identityserver.api ye bağlanıyor
+      - "ConnectionStrings:PostgreSql=User ID=admin; Password=Password12*; Server=discountdb; Port=5432;Database=discountdb;Integrated Security=true;Pooling=true" # postgresql bağlantı cümlesi
+    ports: # port numarası. port numarasını öğrenmek için. appsettings.json da ki port numarasını yazıyor. oradan alıyoruz.
+      - "5014:80" 
+    depends_on: # bağımlılıklar. discountdb çalışmadan discount.api çalışmaz. Bu container ayağa kalmadan önce discountdb ayağa kalksın diyoruz
+      - discountdb 
+  fakepayment.api: # docker-copose.yml deki container ismi
+    container_name: fakepayment.api # container ismi
+    environment: # appsettings.json daki değerleri burda ezeceğiz. appsettigns.json daki isimlerle aynı olmalı
+      - ASPNETCORE_ENVIRONMENT=Development # geliştirme ortamı
+      - IdentityServerURL=http://identityserver.api # identityserver.api ye bağlanıyor
+      - RabbitMQUrl=rabbitmq # rabbitmq ye bağlanıyor. appsettings.json daki içi içeri girerek yolunu belirliyoruz.=rabbitmq ise yukarıdaki rabbitmq container ı ile bağlantı kuruyor
+    ports:
+      - "5016:80"
+  order.api: # docker-copose.yml deki container ismi
+    container_name: order.api # container ismi
+    restart: on-failure # hata olursa tekrar başlat
+    environment: # appsettings.json daki değerleri burda ezeceğiz. appsettigns.json daki isimlerle aynı olmalı. 
+      - ASPNETCORE_ENVIRONMENT=Development # geliştirme ortamı
+      - IdentityServerURL=http://identityserver.api # identityserver.api ye bağlanıyor
+      - RabbitMQUrl=rabbitmq # rabbitmq ye bağlanıyor. appsettings.json daki içi içeri girerek yolunu belirliyoruz.=rabbitmq ise yukarıdaki rabbitmq container ı ile bağlantı kuruyor
+      - "ConnectionStrings:DefaultConnection=Server=orderdb,1433;Database=OrderDb; User=sa; Password=Password12*" # sql server bağlantı cümlesi
+    ports: # port numarası. port numarasını öğrenmek için. appsettings.json da ki port numarasını yazıyor. oradan alıyoruz.
+      - "5015:80" 
+    depends_on: # bağımlılıklar. orderdb çalışmadan order.api çalışmaz. Bu container ayağa kalmadan önce orderdb ayağa kalksın diyoruz
+      - orderdb # orderdb container ı ile bağlantı kuruyor 
+  #gateway
+  # önce configuration.production.json dosyasının içindeki "Host": "localhostu", "Host": "catalog.api" değiştiriyoruz ve tüm portları 80 olarak ayarlıyoruz. services altındaki isimlerle aynı olmalı!!!
+  # containerler arası haberleşme 80 portu üzerinden oluyor.
+  # configuration.production.json daki GlobalConfigurationdaki BaseUrl adresini http://gateway.api olarak değiştiriyoruz
+  gateway.api:
+    container_name: gateway.api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - IdentityServerURL=http://identityserver.api
+    ports:
+      - "5000:80"
+  aspnetcoremvc.web:
+    container_name: aspnetcoremvc.web
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ServiceApiSettings:IdentityBaseUri=http://identityserver.api # appsettings.json daki içindeki ayarları burda ezmenin en güzel örneği. isimleri ve alt isimleri dikkat et nasıl yapıldığına dair. appsettings.json daki isimlerle aynı olmalı
+      - ServiceApiSettings:GatewayBaseUri=http://gateway.api
+
+    ports:
+      - "5010:80"
+    depends_on: # bağımlılıklar. identityserver.api çalışmadan aspnetcoremvc.web çalışmaz. Bu container ayağa kalmadan önce identityserver.api ayağa kalksın diyoruz
+      - gateway.api # gateway.api container ı ile bağlantı kuruyor
+      - identityserver.api # isimler yukarıdan alınıyor
+      - catalog.api
+      - basket.api
+      - discount.api
+      - order.api
+      - photostock.api
+      - fakepayment.api

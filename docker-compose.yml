@@ -1,0 +1,65 @@
+version: "3.8" # versiyonu
+services:
+  catalogdb: # servis adı yani veritabanı adı. Containerler birbirleriyle haberleşmeyi burdaki isim üzerinden yaparlar.
+    image: mongo # kullanılacak image yani veritabanın hangi image kullanılacak
+  basketdb: 
+    image: redis
+  discountdb:
+    image: postgres
+  identitydb: 
+    image: mcr.microsoft.com/mssql/server:2019-latest # 2019-latest tagı ile 2019 sürümünü kullanıyoruz.
+  orderdb:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+  rabbitmq:
+    image: rabbitmq:3.8.14-management # management ile rabbitmq arayüzüne erişebiliriz. o yüzden management li olan versiyonu kullanıyoruz.
+  catalog.api:
+    image: catalog_api_image
+    build: # dockerfile ile image oluşturmak yerine build ile image oluşturuyoruz.
+      context: . # . ile docker-compose.yml dosyasının bulunduğu klasörü belirtiyoruz. burdaki . kök dizini yani docker-compose.yml dosyasının bulunduğu klasörü belirtiyor.
+      dockerfile: Services/Catalog/FreeCourse.Services.Catalog/Dockerfile
+  identityserver.api: # identityserver api için image oluşturuyoruz.
+    image: identityserver_api_image # image adı
+    build: # dockerfile ile image oluşturmak yerine build ile image oluşturuyoruz.
+      context: . # . ile docker-compose.yml dosyasının bulunduğu klasörü belirtiyoruz. burdaki . kök dizini yani docker-compose.yml dosyasının bulunduğu klasörü belirtiyor.
+      dockerfile: IdentityServer/FreeCourse.IdentityServer/Dockerfile # dockerfile dosyasının yolu
+  basket.api:
+    image: basket_api_image
+    build:
+      context: .
+      dockerfile: Services/Basket/FreeCourse.Services.Basket/Dockerfile
+  photostock.api: # ismi photostock.api olan bir image oluşturuyoruz.
+    image: photostock_api_image # image adı
+    build: # dockerfile ile image oluşturmak yerine build ile image oluşturuyoruz.
+      context: . # . ile docker-compose.yml dosyasının bulunduğu klasörü belirtiyoruz. burdaki . kök dizini yani docker-compose.yml dosyasının bulunduğu klasörü belirtiyor.
+      dockerfile: Services/PhotoStock/FreeCourse.Services.PhotoStock/Dockerfile
+  discount.api: # ismi discount.api olan bir image oluşturuyoruz.
+    image: discount_api_image # image adı
+    build: # dockerfile ile image oluşturmak yerine build ile image oluşturuyoruz.
+      context: . # . ile docker-compose.yml dosyasının bulunduğu klasörü belirtiyoruz. burdaki . kök dizini yani docker-compose.yml dosyasının bulunduğu klasörü belirtiyor.
+      dockerfile: Services/Discount/FreeCourse.Services.Discount/Dockerfile # dockerfile dosyasının yolu
+  fakepayment.api:
+    image: fakepayment_api_image # image adı
+    build: # dockerfile ile image oluşturmak yerine build ile image oluşturuyoruz.
+      context: . # . ile docker-compose.yml dosyasının bulunduğu klasörü belirtiyoruz. burdaki . kök dizini yani docker-compose.yml dosyasının bulunduğu klasörü belirtiyor.
+      dockerfile: Services/FakePayment/FreeCourse.Services.FakePayment/Dockerfile # dockerfile dosyasının yolu
+  order.api: # ismi order.api olan bir image oluşturuyoruz.
+    image: order_api_image # image adı
+    build:
+      context: . # . ile docker-compose.yml dosyasının bulunduğu klasörü belirtiyoruz. burdaki . kök dizini yani docker-compose.yml dosyasının bulunduğu klasörü belirtiyor.
+      dockerfile: Services/Order/FreeCourse.Services.Order.API/Dockerfile # dockerfile dosyasının yolu
+  gateway.api: # ismi gateway.api olan bir image oluşturuyoruz.
+    image: gateway_api_image
+    build:
+      context: .
+      dockerfile: FreeCourse.Gateway/Dockerfile
+  aspnetcoremvc.web:
+    image: aspnetcoremvc.web_image
+    build:
+      context: .
+      dockerfile: Frontends/FreeCourse.Web/Dockerfile
+
+volumes: # veritabanlarının verilerini tutmak için kullanıyoruz. veritabanı containerlerini silsek bile verileri silinmez.
+  catalogdb_volume: 
+  discount_volume:
+  identitydb_volume:
+  orderdb_volume:
