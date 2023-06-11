@@ -1,4 +1,6 @@
-﻿Services
+﻿https://github.com/Fcakiroglu16
+
+Services
 	-catalogAPI     => 5011 => url: http://localhost:5011/swagger/index.html postman: http://localhost:5011/api/categories
 	-photostockAPI  => 5012 => url: http://localhost:5012/swagger/index.html postman: http://localhost:5012/api/photos
 	-basketAPI      => 5013 => url: http://localhost:5013/swagger/index.html
